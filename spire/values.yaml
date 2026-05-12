@@ -104,7 +104,7 @@ agent:
       timeoutSeconds: 3
 
 storage:
-  class: vsphere-db
+  class: ""
   size: 1Gi
   postgres:
     host: postgres.default.svc.cluster.local
@@ -114,7 +114,7 @@ storage:
     sslmode: disable
     password: ""
     existingSecret:
-      name: ""
+      name: spire-postgres
       key: password
 
 networkPolicy:

@@ -10,6 +10,7 @@ spec:
   podSelector:
     matchLabels:
       {{- include "openbao.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
   policyTypes:
     - Ingress
     - Egress
