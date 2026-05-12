@@ -96,6 +96,9 @@ agent:
     annotations: {}
   probes:
     enabled: false
+    command:
+      - /opt/spire/bin/spire-agent
+      - healthcheck
     readiness:
       periodSeconds: 10
       timeoutSeconds: 3

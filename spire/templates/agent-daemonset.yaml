@@ -54,12 +54,14 @@ spec:
           {{- if .Values.agent.probes.enabled }}
           readinessProbe:
             exec:
-              command: ["/opt/spire/bin/spire-agent", "healthcheck"]
+              command:
+                {{- toYaml .Values.agent.probes.command | nindent 16 }}
             periodSeconds: {{ .Values.agent.probes.readiness.periodSeconds }}
             timeoutSeconds: {{ .Values.agent.probes.readiness.timeoutSeconds }}
           livenessProbe:
             exec:
-              command: ["/opt/spire/bin/spire-agent", "healthcheck"]
+              command:
+                {{- toYaml .Values.agent.probes.command | nindent 16 }}
             periodSeconds: {{ .Values.agent.probes.liveness.periodSeconds }}
             timeoutSeconds: {{ .Values.agent.probes.liveness.timeoutSeconds }}
           {{- end }}
