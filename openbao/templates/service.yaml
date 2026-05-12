@@ -2,14 +2,24 @@ apiVersion: v1
 kind: Service
 
 metadata:
-  name: {{ .Release.Name }}
+  name: {{ include "openbao.fullname" . }}
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with merge .Values.service.annotations .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
 spec:
   selector:
-    app: {{ .Release.Name }}
+    {{- include "openbao.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 
   ports:
-    - port: 8200
-      targetPort: 8200
+    - name: {{ if .Values.tls.enabled }}https{{ else }}http{{ end }}
+      port: {{ .Values.service.port }}
+      targetPort: api
+      protocol: TCP
 
-  type: ClusterIP
+  type: {{ .Values.service.type }}

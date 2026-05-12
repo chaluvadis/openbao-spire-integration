@@ -2,20 +2,34 @@ apiVersion: v1
 kind: ConfigMap
 
 metadata:
-  name: {{ .Release.Name }}-config
+  name: {{ include "openbao.fullname" . }}-config
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 
 data:
   openbao.hcl: |
     ui = true
-    
-    api_addr = "http://{{ .Release.Name }}.{{ .Release.Namespace }}.svc.cluster.local:8200"
-    
-    cluster_addr = "http://{{ .Release.Name }}-0.{{ .Release.Name }}-headless:8201"
-    
+
+    api_addr = "{{ include "openbao.scheme" . }}://{{ include "openbao.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}"
+
+    cluster_addr = "{{ include "openbao.scheme" . }}://{{ include "openbao.fullname" . }}-0.{{ include "openbao.fullname" . }}-headless:{{ .Values.service.clusterPort }}"
+
     listener "tcp" {
-      address         = "0.0.0.0:8200"
-      cluster_address = "0.0.0.0:8201"
-      tls_disable     = 1
+      address         = "0.0.0.0:{{ .Values.service.port }}"
+      cluster_address = "0.0.0.0:{{ .Values.service.clusterPort }}"
+    {{- if .Values.tls.enabled }}
+      tls_cert_file = "/etc/openbao/tls/tls.crt"
+      tls_key_file  = "/etc/openbao/tls/tls.key"
+    {{- if .Values.tls.secretName }}
+      tls_client_ca_file = "/etc/openbao/tls/ca.crt"
+    {{- end }}
+    {{- else }}
+      tls_disable = 1
+    {{- end }}
     }
 
     storage "raft" {

@@ -1,0 +1,30 @@
+1. SPIRE has been deployed in the {{ .Release.Namespace }} namespace.
+
+   SPIRE Server:
+     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/component=server
+
+   SPIRE Agents (one per node):
+     kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/component=agent
+
+2. Trust domain: {{ .Values.trustDomain }}
+   SPIRE Server address: {{ include "spire.fqdn" . }}:{{ .Values.server.port }}
+
+3. To register a workload entry (example):
+     kubectl exec -n {{ .Release.Namespace }} {{ include "spire.server" . }}-0 -- \
+       /opt/spire/bin/spire-server entry create \
+       -spiffeID spiffe://{{ .Values.trustDomain }}/ns/default/sa/myapp \
+       -parentID spiffe://{{ .Values.trustDomain }}/ns/{{ .Release.Namespace }}/sa/{{ include "spire.agent.serviceAccountName" . }} \
+       -selector k8s:ns:default \
+       -selector k8s:sa:myapp
+
+4. Database password:
+{{- if .Values.storage.postgres.existingSecret }}
+   ✅ Using existing Kubernetes Secret: {{ .Values.storage.postgres.existingSecret }}
+{{- else }}
+   ⚠️  WARNING: No existingSecret is configured for the database password.
+   It is strongly recommended to create a Kubernetes Secret and set:
+     storage.postgres.existingSecret=<secret-name>
+   Do NOT store plaintext passwords in values.yaml.
+{{- end }}
+
+5. For more information visit: https://spiffe.io/docs/latest/

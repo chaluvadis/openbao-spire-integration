@@ -1,28 +1,141 @@
+## @section Global parameters
+
+# Override chart name
+nameOverride: ""
+# Override fully qualified app name
+fullnameOverride: ""
+
+# Labels applied to all resources
+commonLabels: {}
+# Annotations applied to all resources
+commonAnnotations: {}
+
+## @section Image configuration
 image:
   repository: ghcr.io/openbao/openbao
   tag: "2.5.3"
   pullPolicy: IfNotPresent
 
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+## @section Replica and deployment configuration
+serverReplicaCount: 3
+
+## @section TLS configuration
+# Set tls.enabled=true for production. Provide a Kubernetes TLS Secret.
+tls:
+  enabled: false
+  # Name of an existing TLS secret with keys: tls.crt, tls.key, ca.crt
+  secretName: ""
+
+## @section Service configuration
 service:
   enabled: true
   type: ClusterIP
   port: 8200
+  clusterPort: 8201
+  annotations: {}
 
+## @section Data storage configuration
 dataStorage:
   enabled: true
   size: 10Gi
-  storageClass: vsphere-db
+  storageClass: ""
 
+## @section Service account configuration
 serviceAccount:
   create: true
-  name: openbao
+  # If empty and create=true, defaults to the fullname
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: true
 
-resources: {}
+## @section RBAC configuration
+rbac:
+  create: true
 
-injector:
-  enabled: false
+## @section Resource requests and limits
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
 
-serverReplicaCount: 3
+## @section Pod scheduling
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
 
+## @section Pod security context
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+
+## @section Container security context
+containerSecurityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+## @section Pod annotations and labels
+podAnnotations: {}
+podLabels: {}
+
+## @section Probes
+startupProbe:
+  enabled: true
+  failureThreshold: 30
+  periodSeconds: 10
+
+readinessProbe:
+  enabled: true
+  failureThreshold: 3
+  periodSeconds: 10
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  failureThreshold: 3
+  periodSeconds: 30
+
+## @section StatefulSet update strategy
+updateStrategy:
+  type: RollingUpdate
+
+podManagementPolicy: Parallel
+
+revisionHistoryLimit: 3
+
+terminationGracePeriodSeconds: 30
+
+## @section PodDisruptionBudget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+## @section NetworkPolicy
 networkPolicy:
+  enabled: false
+  # Additional ingress rules beyond the default pod-to-pod and API port rules
+  extraIngress: []
+  # Additional egress rules
+  extraEgress: []
+
+## @section Anti-affinity (applied when affinity is empty)
+podAntiAffinity: soft  # "soft" (preferred) or "hard" (required)
+
+## @section Injector (future use)
+injector:
   enabled: false

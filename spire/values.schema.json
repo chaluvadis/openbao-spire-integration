@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SPIRE Helm Chart Values",
+  "type": "object",
+  "properties": {
+    "nameOverride": { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+    "commonLabels": { "type": "object" },
+    "commonAnnotations": { "type": "object" },
+    "trustDomain": { "type": "string" },
+    "imagePullSecrets": { "type": "array" },
+    "server": {
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "port": { "type": "integer" },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "nodeSelector": { "type": "object" },
+        "tolerations": { "type": "array" },
+        "affinity": { "type": "object" },
+        "topologySpreadConstraints": { "type": "array" },
+        "priorityClassName": { "type": "string" },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "readinessProbe": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "livenessProbe": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "create": { "type": "boolean" },
+            "name": { "type": "string" },
+            "annotations": { "type": "object" },
+            "automountServiceAccountToken": { "type": "boolean" }
+          }
+        },
+        "podDisruptionBudget": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "minAvailable": {},
+            "maxUnavailable": {}
+          }
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "tag": { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] },
+        "resources": { "type": "object" },
+        "podSecurityContext": { "type": "object" },
+        "containerSecurityContext": { "type": "object" },
+        "nodeSelector": { "type": "object" },
+        "tolerations": { "type": "array" },
+        "priorityClassName": { "type": "string" },
+        "podAnnotations": { "type": "object" },
+        "podLabels": { "type": "object" },
+        "readinessProbe": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "livenessProbe": {
+          "type": "object",
+          "properties": { "enabled": { "type": "boolean" } }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "create": { "type": "boolean" },
+            "name": { "type": "string" },
+            "annotations": { "type": "object" },
+            "automountServiceAccountToken": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "properties": {
+        "postgres": {
+          "type": "object",
+          "properties": {
+            "host": { "type": "string" },
+            "port": { "type": "integer" },
+            "db": { "type": "string" },
+            "user": { "type": "string" },
+            "existingSecret": { "type": "string" },
+            "existingSecretPasswordKey": { "type": "string" },
+            "sslmode": { "type": "string" }
+          },
+          "not": {
+            "required": ["password"]
+          }
+        },
+        "class": { "type": "string" },
+        "size": { "type": "string" }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "extraIngress": { "type": "array" },
+        "extraEgress": { "type": "array" }
+      }
+    }
+  }
+}

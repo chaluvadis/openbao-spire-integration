@@ -1,6 +1,18 @@
 apiVersion: v2
 name: openbao
-description: OpenBao secrets management system
+description: OpenBao secrets management system for production Kubernetes deployments
 type: application
-version: 0.1.0
-appVersion: "2.0.0"
+version: 0.2.0
+appVersion: "2.5.3"
+kubeVersion: ">=1.24.0-0"
+keywords:
+  - secrets
+  - pki
+  - vault
+  - openbao
+  - zero-trust
+home: https://openbao.org
+sources:
+  - https://github.com/openbao/openbao
+maintainers:
+  - name: chaluvadis

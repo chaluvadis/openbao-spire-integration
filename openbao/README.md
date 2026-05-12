@@ -1,162 +1,214 @@
 # 📘 OpenBao Helm Chart
 
-This chart deploys **OpenBao** as a high-availability secrets and PKI system on Kubernetes using StatefulSet (Raft storage).
+This chart deploys **OpenBao** as a high-availability secrets and PKI system on Kubernetes using a StatefulSet with Raft storage.
 
 ---
 
-# 🧭 Prerequisites
+## 🧭 Prerequisites
 
-- Kubernetes cluster (v1.24+ recommended)
+- Kubernetes cluster (v1.24+)
 - Helm 3+
 - StorageClass available (for persistent volumes)
 
 ---
 
-# 📦 1. Installation
+## 📦 Installation
 
-## 1.1 Create namespace
+### Create namespace and install
 
-You must create a namespace before installing OpenBao:
+```bash
+kubectl create namespace prod-security
 
-```bash id="i1"
-kubectl create namespace <namespace-name>
-```
-
-Example:
-
-```bash id="i2"
-kubectl create namespace dev-security
-```
-
----
-
-## 1.2 Install OpenBao
-
-```bash id="i3"
-helm install <release-name> ./openbao \
-  -n <namespace-name>
-```
-
-Example:
-
-```bash id="i4"
 helm install openbao ./openbao \
-  -n dev-security
+  -n prod-security \
+  -f my-values.yaml
+```
+
+### Verify installation
+
+```bash
+kubectl get pods -n prod-security
+kubectl get svc -n prod-security
 ```
 
 ---
 
-## 1.3 Verify installation
+## 🔐 First-time initialization
 
-```bash id="i5"
-kubectl get pods -n <namespace-name>
-kubectl get svc -n <namespace-name>
+After installation, OpenBao starts in a **sealed state** and must be initialized once.
+
+### Initialize
+
+```bash
+kubectl exec -it openbao-0 -n prod-security -- bao operator init
 ```
 
-Example:
+Save the **unseal keys** and **root token** securely (e.g., in a hardware security module or offline vault).
 
-```bash id="i6"
-kubectl get pods -n dev-security
+### Unseal each pod
+
+```bash
+kubectl exec -it openbao-0 -n prod-security -- bao operator unseal <UNSEAL_KEY_1>
+kubectl exec -it openbao-0 -n prod-security -- bao operator unseal <UNSEAL_KEY_2>
+kubectl exec -it openbao-0 -n prod-security -- bao operator unseal <UNSEAL_KEY_3>
 ```
+
+Repeat for each pod (`openbao-1`, `openbao-2`, etc.).
 
 ---
 
-# 🔐 2. First-time initialization (IMPORTANT)
+## 🔒 Security posture
 
-After installation, OpenBao starts in a **sealed state**.
+### TLS (recommended for production)
 
-## 2.1 Initialize cluster
+By default TLS is **disabled** for easy bootstrapping. Enable it for production:
 
-```bash id="i7"
-kubectl exec -it <release-name>-0 -n <namespace-name> -- openbao operator init
+1. Create a TLS secret:
+
+```bash
+kubectl create secret tls openbao-tls \
+  --cert=tls.crt \
+  --key=tls.key \
+  -n prod-security
 ```
 
-Example:
+2. Set in your values file:
 
-```bash id="i8"
-kubectl exec -it openbao-0 -n dev-security -- openbao operator init
+```yaml
+tls:
+  enabled: true
+  secretName: openbao-tls
 ```
 
-You will receive:
+### Security contexts
 
-- unseal keys
-- root token
+Production-hardened security context defaults are applied:
+
+```yaml
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+
+containerSecurityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+### RBAC
+
+Pod-scoped operations (patch/update) use a **namespaced Role**. Cluster-scoped read permissions (namespace/service/node discovery for HA) use a minimal **ClusterRole**.
 
 ---
 
-## 2.2 Unseal nodes
+## ⚙️ Configuration
 
-Run for each pod:
+### Hardened production values example
 
-```bash id="i9"
-kubectl exec -it <pod-name> -n <namespace-name> -- openbao operator unseal
+```yaml
+serverReplicaCount: 3
+
+tls:
+  enabled: true
+  secretName: openbao-tls
+
+service:
+  type: ClusterIP
+  port: 8200
+
+dataStorage:
+  size: 20Gi
+  storageClass: fast-ssd
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+
+podAntiAffinity: hard
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+networkPolicy:
+  enabled: true
+
+serviceAccount:
+  create: true
+  automountServiceAccountToken: true
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8200"
+  prometheus.io/path: "/v1/sys/metrics"
 ```
+
+### Key values reference
+
+| Parameter | Description | Default |
+|---|---|---|
+| `serverReplicaCount` | Number of OpenBao pods | `3` |
+| `tls.enabled` | Enable TLS on the listener | `false` |
+| `tls.secretName` | Name of the TLS Secret | `""` |
+| `service.type` | Kubernetes service type | `ClusterIP` |
+| `service.port` | API port | `8200` |
+| `service.clusterPort` | Raft cluster port | `8201` |
+| `dataStorage.size` | PVC size | `10Gi` |
+| `dataStorage.storageClass` | StorageClass name | `""` (cluster default) |
+| `resources` | Container resource requests/limits | see values.yaml |
+| `podAntiAffinity` | `soft` or `hard` pod anti-affinity | `soft` |
+| `podDisruptionBudget.enabled` | Enable PDB | `true` |
+| `networkPolicy.enabled` | Enable NetworkPolicy | `false` |
+| `serviceAccount.create` | Create service account | `true` |
+| `rbac.create` | Create RBAC resources | `true` |
 
 ---
 
-# 🔄 3. Upgrade OpenBao
+## 🔄 Upgrade notes
 
-To update configuration or version:
-
-```bash id="i10"
-helm upgrade <release-name> ./openbao \
-  -n <namespace-name>
-```
-
-Example:
-
-```bash id="i11"
-helm upgrade openbao ./openbao \
-  -n dev-security
-```
+- Config checksum annotations are applied to the pod template; config changes **automatically trigger rolling restarts**.
+- StatefulSet uses `Parallel` pod management by default for faster rollouts.
+- Always review OpenBao release notes before upgrading the `appVersion`.
+- For Raft HA upgrades, upgrade one pod at a time and confirm cluster health before proceeding.
+- **Avoid `helm upgrade --force`** — it forcefully replaces resources and can interrupt quorum.
 
 ---
 
-# 🧹 4. Uninstall OpenBao
+## 🧹 Uninstall
 
-## 4.1 Delete Helm release
-
-```bash id="i12"
-helm uninstall <release-name> -n <namespace-name>
+```bash
+helm uninstall openbao -n prod-security
 ```
 
-Example:
-
-```bash id="i13"
-helm uninstall openbao -n dev-security
-```
+> ⚠️ PVCs are **not** deleted automatically. Remove them manually if you want to clean up storage:
+> ```bash
+> kubectl delete pvc -l app.kubernetes.io/name=openbao -n prod-security
+> ```
 
 ---
 
-## 4.2 Delete namespace (IMPORTANT)
+## 🧠 Naming conventions
 
-⚠️ This will remove ALL resources inside the namespace including PVCs (if not retained).
-
-```bash id="i14"
-kubectl delete namespace <namespace-name>
-```
-
-Example:
-
-```bash id="i15"
-kubectl delete namespace dev-security
-```
+| Concept | Format |
+|---|---|
+| Helm release | `openbao` |
+| StatefulSet pods | `openbao-0`, `openbao-1`, `openbao-2` |
+| Config ConfigMap | `openbao-config` |
+| Headless service | `openbao-headless` |
 
 ---
 
-# 🧠 5. Naming conventions
+## ⚠️ Important notes
 
-| Concept          | Format                                              |
-| ---------------- | --------------------------------------------------- |
-| Helm release     | `openbao`                                           |
-| Namespace        | environment-based (`dev-security`, `prod-security`) |
-| StatefulSet pods | `openbao-0`, `openbao-1`                            |
-
----
-
-# ⚠️ 6. Important notes
-
-- Do NOT hardcode namespace inside templates
-- Always use Helm release name for resource identity
-- Persistent data is stored in PVCs (Raft storage)
-- Unsealing is required after restart unless auto-unseal is configured later
+- Persistent data is stored in PVCs (Raft storage) — back them up before upgrades.
+- Unsealing is required after restart unless auto-unseal (KMS/transit) is configured.
+- The chart disables TLS by default for ease of development; **always enable TLS in production**.
+- Store unseal keys and root token in a secure external system, never in Kubernetes Secrets or version control.
