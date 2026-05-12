@@ -1,3 +1,6 @@
+{{- if and (not .Values.storage.postgres.existingSecret.name) (not .Values.storage.postgres.password) -}}
+{{- fail "Either storage.postgres.existingSecret.name or storage.postgres.password must be set." -}}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

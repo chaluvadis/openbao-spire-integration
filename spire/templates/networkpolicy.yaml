@@ -37,7 +37,7 @@ spec:
         - port: 53
           protocol: TCP
     {{- end }}
-    {{- with .Values.networkPolicy.agentEgress }}
+    {{- with .Values.networkPolicy.serverEgress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 ---
