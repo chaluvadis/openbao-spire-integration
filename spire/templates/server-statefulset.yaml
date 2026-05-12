@@ -70,6 +70,36 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
+      {{- if .Values.storage.postgres.existingSecret }}
+      initContainers:
+        - name: render-config
+          image: "{{ .Values.server.image }}:{{ .Values.server.tag }}"
+          imagePullPolicy: {{ .Values.server.pullPolicy }}
+          command:
+            - sh
+            - -c
+            - |
+              DB_PASS=$(cat /run/spire/secrets/password)
+              sed "s/SPIRE_DB_PASSWORD_PLACEHOLDER/${DB_PASS}/g" \
+                /config-tpl/server.conf.tpl > /config/server.conf
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config-tpl
+              mountPath: /config-tpl
+              readOnly: true
+            - name: config-rendered
+              mountPath: /config
+            - name: db-secret
+              mountPath: /run/spire/secrets
+              readOnly: true
+      {{- end }}
+
       containers:
         - name: spire-server
           image: "{{ .Values.server.image }}:{{ .Values.server.tag }}"
@@ -84,15 +114,6 @@ spec:
               containerPort: {{ .Values.server.port }}
               protocol: TCP
 
-          env:
-            {{- if .Values.storage.postgres.existingSecret }}
-            - name: SPIRE_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.storage.postgres.existingSecret }}
-                  key: {{ .Values.storage.postgres.existingSecretPasswordKey }}
-            {{- end }}
-
           securityContext:
             {{- toYaml .Values.server.containerSecurityContext | nindent 12 }}
 
@@ -100,7 +121,7 @@ spec:
             {{- toYaml .Values.server.resources | nindent 12 }}
 
           volumeMounts:
-            - name: config
+            - name: {{ if .Values.storage.postgres.existingSecret }}config-rendered{{ else }}config-tpl{{ end }}
               mountPath: /run/spire/config
               readOnly: true
             - name: data
@@ -125,9 +146,19 @@ spec:
           {{- end }}
 
       volumes:
-        - name: config
+        - name: config-tpl
           configMap:
             name: {{ include "spire.server" . }}-config
+        {{- if .Values.storage.postgres.existingSecret }}
+        - name: config-rendered
+          emptyDir: {}
+        - name: db-secret
+          secret:
+            secretName: {{ .Values.storage.postgres.existingSecret }}
+            items:
+              - key: {{ .Values.storage.postgres.existingSecretPasswordKey }}
+                path: password
+        {{- end }}
 
   volumeClaimTemplates:
     - metadata:

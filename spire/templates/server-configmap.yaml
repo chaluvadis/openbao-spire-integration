@@ -11,7 +11,7 @@ metadata:
   {{- end }}
 
 data:
-  server.conf: |
+  server.conf.tpl: |
     server {
       bind_address = "0.0.0.0"
       bind_port = "{{ .Values.server.port }}"
@@ -26,8 +26,7 @@ data:
         plugin_data {
           database_type = "postgres"
           {{- if .Values.storage.postgres.existingSecret }}
-          # Password is injected via environment variable from Secret {{ .Values.storage.postgres.existingSecret }}
-          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} password=${SPIRE_DB_PASSWORD} sslmode={{ .Values.storage.postgres.sslmode }}"
+          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} password=SPIRE_DB_PASSWORD_PLACEHOLDER sslmode={{ .Values.storage.postgres.sslmode }}"
           {{- else }}
           connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} sslmode={{ .Values.storage.postgres.sslmode }}"
           {{- end }}

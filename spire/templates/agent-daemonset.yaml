@@ -59,26 +59,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 
-      initContainers:
-        - name: init-server-wait
-          image: "{{ .Values.agent.image }}:{{ .Values.agent.tag }}"
-          imagePullPolicy: {{ .Values.agent.pullPolicy }}
-          command:
-            - /opt/spire/bin/spire-agent
-            - healthcheck
-            - -socketPath
-            - /run/spire/sockets/agent.sock
-          securityContext:
-            runAsNonRoot: false
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            capabilities:
-              drop:
-                - ALL
-          volumeMounts:
-            - name: socket
-              mountPath: /run/spire/sockets
-
       containers:
         - name: spire-agent
           image: "{{ .Values.agent.image }}:{{ .Values.agent.tag }}"
