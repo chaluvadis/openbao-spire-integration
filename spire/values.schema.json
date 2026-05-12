@@ -69,25 +69,7 @@
                 "key": { "type": "string", "minLength": 1 }
               }
             }
-          },
-          "oneOf": [
-            {
-              "properties": {
-                "existingSecret": {
-                  "properties": {
-                    "name": { "minLength": 1 }
-                  },
-                  "required": ["name"]
-                }
-              }
-            },
-            {
-              "properties": {
-                "password": { "minLength": 1 }
-              },
-              "required": ["password"]
-            }
-          ]
+          }
         }
       }
     }

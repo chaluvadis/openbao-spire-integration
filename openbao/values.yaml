@@ -66,9 +66,10 @@ resources:
     memory: 1Gi
 
 dataStorage:
+  # Disabling persistent storage uses emptyDir and will lose data on restart.
   enabled: true
   size: 10Gi
-  storageClass: vsphere-db
+  storageClass: ""
 
 config:
   ui: true

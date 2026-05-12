@@ -117,7 +117,7 @@ storage:
     sslmode: disable
     password: ""
     existingSecret:
-      name: spire-postgres
+      name: ""
       key: password
 
 networkPolicy:
