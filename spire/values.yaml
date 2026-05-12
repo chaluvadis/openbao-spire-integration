@@ -1,19 +1,124 @@
+nameOverride: ""
+fullnameOverride: ""
+
 trustDomain: cluster.local
 
+commonLabels: {}
+commonAnnotations: {}
+
+imagePullSecrets: []
+priorityClassName: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
 server:
-  image: ghcr.io/spiffe/spire-server
-  tag: 1.14.5
+  image:
+    repository: ghcr.io/spiffe/spire-server
+    tag: "1.14.5"
+    pullPolicy: IfNotPresent
   port: 8081
   replicas: 1
+  service:
+    type: ClusterIP
+    annotations: {}
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    startup:
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 3
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      timeoutSeconds: 3
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  revisionHistoryLimit: 10
+  updateStrategy:
+    type: RollingUpdate
+  serviceAccount:
+    create: true
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
 
 agent:
-  image: ghcr.io/spiffe/spire-agent
-  tag: 1.14.5
+  image:
+    repository: ghcr.io/spiffe/spire-agent
+    tag: "1.14.5"
+    pullPolicy: IfNotPresent
+  podAnnotations: {}
+  podSecurityContext: {}
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  serviceAccount:
+    create: true
+    name: ""
+    automountServiceAccountToken: true
+    annotations: {}
+  probes:
+    enabled: false
+    readiness:
+      periodSeconds: 10
+      timeoutSeconds: 3
+    liveness:
+      periodSeconds: 20
+      timeoutSeconds: 3
 
 storage:
+  class: vsphere-db
+  size: 1Gi
   postgres:
     host: postgres.default.svc.cluster.local
     port: 5432
     db: spire
     user: spire
-    password: spirepass
+    sslmode: disable
+    password: ""
+    existingSecret:
+      name: ""
+      key: password
+
+networkPolicy:
+  enabled: false
+  allowDns: true
+  serverIngress: []
+  agentEgress: []

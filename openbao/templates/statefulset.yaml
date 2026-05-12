@@ -1,105 +1,150 @@
 apiVersion: apps/v1
 kind: StatefulSet
-
 metadata:
-  name: {{ .Release.Name }}
-
+  name: {{ include "openbao.fullname" . }}
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  serviceName: {{ .Release.Name }}-headless
+  serviceName: {{ include "openbao.headlessServiceName" . }}
   replicas: {{ .Values.serverReplicaCount }}
-
+  podManagementPolicy: {{ .Values.podManagementPolicy }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  updateStrategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
   selector:
     matchLabels:
-      app: {{ .Release.Name }}
-
+      {{- include "openbao.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: {{ .Release.Name }}
-
+        {{- include "openbao.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.commonAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
-      serviceAccountName: {{ .Release.Name }}
-
+      serviceAccountName: {{ include "openbao.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       securityContext:
-        fsGroup: 1000
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroupChangePolicy: "OnRootMismatch"
-
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: openbao
-
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-
           args:
             - "server"
             - "-config=/etc/openbao/openbao.hcl"
-
           ports:
             - name: api
-              containerPort: 8200
-
+              containerPort: {{ .Values.service.port }}
             - name: cluster
-              containerPort: 8201
-
+              containerPort: {{ .Values.service.clusterPort }}
           env:
             - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
-
-            - name: POD_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-
-            - name: BAO_K8S_POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-
-            - name: BAO_K8S_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-
           securityContext:
-            runAsNonRoot: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: api
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.tls.enabled }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204
+              port: api
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.tls.enabled }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /v1/sys/health?standbyok=true
+              port: api
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.tls.enabled }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
           volumeMounts:
             - name: config
               mountPath: /etc/openbao
-
             - name: data
               mountPath: /openbao/data
-
+            {{- if .Values.tls.enabled }}
+            - name: tls
+              mountPath: /etc/openbao/tls
+              readOnly: true
+            {{- end }}
           resources:
-            requests:
-              cpu: 250m
-              memory: 512Mi
-            limits:
-              cpu: 500m
-              memory: 1Gi
-
+            {{- toYaml .Values.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
-            name: {{ .Release.Name }}-config
-
+            name: {{ include "openbao.fullname" . }}-config
+        {{- if .Values.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+        {{- end }}
+        {{- if not .Values.dataStorage.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- if .Values.dataStorage.enabled }}
   volumeClaimTemplates:
     - metadata:
         name: data
-
+        labels:
+          {{- include "openbao.labels" . | nindent 10 }}
+          app.kubernetes.io/component: server
       spec:
         accessModes:
           - ReadWriteOnce
-        storageClassName: {{ .Values.dataStorage.storageClass }}
-
+        {{- with .Values.dataStorage.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
         resources:
           requests:
             storage: {{ .Values.dataStorage.size }}
+{{- end }}

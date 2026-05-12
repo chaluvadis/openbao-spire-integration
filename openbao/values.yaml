@@ -1,28 +1,109 @@
+nameOverride: ""
+fullnameOverride: ""
+
+commonLabels: {}
+commonAnnotations: {}
+
 image:
   repository: ghcr.io/openbao/openbao
   tag: "2.5.3"
   pullPolicy: IfNotPresent
 
+imagePullSecrets: []
+
+serverReplicaCount: 3
+revisionHistoryLimit: 10
+podManagementPolicy: Parallel
+updateStrategy:
+  type: RollingUpdate
+
 service:
   enabled: true
   type: ClusterIP
   port: 8200
+  clusterPort: 8201
+  annotations: {}
+
+podAnnotations: {}
+
+priorityClassName: ""
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+serviceAccount:
+  create: true
+  name: ""
+  automountServiceAccountToken: false
+  annotations: {}
+
+rbac:
+  create: true
+
+podSecurityContext:
+  fsGroup: 1000
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+
+containerSecurityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
 
 dataStorage:
   enabled: true
   size: 10Gi
   storageClass: vsphere-db
 
-serviceAccount:
-  create: true
-  name: openbao
+config:
+  ui: true
+  extraConfig: ""
 
-resources: {}
-
-injector:
+tls:
   enabled: false
+  secretName: ""
+  certFile: tls.crt
+  keyFile: tls.key
+  caFile: ca.crt
 
-serverReplicaCount: 3
+probes:
+  startup:
+    failureThreshold: 60
+    periodSeconds: 5
+    timeoutSeconds: 3
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 6
+  liveness:
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 6
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
 
 networkPolicy:
+  enabled: false
+  allowDns: true
+  ingress: []
+  egress: []
+
+injector:
   enabled: false

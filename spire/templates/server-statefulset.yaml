@@ -1,53 +1,129 @@
 apiVersion: apps/v1
 kind: StatefulSet
-
 metadata:
   name: {{ include "spire.server" . }}
-
+  labels:
+    {{- include "spire.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   serviceName: {{ include "spire.server" . }}
   replicas: {{ .Values.server.replicas }}
-
+  revisionHistoryLimit: {{ .Values.server.revisionHistoryLimit }}
+  updateStrategy:
+    {{- toYaml .Values.server.updateStrategy | nindent 4 }}
   selector:
     matchLabels:
-      app: {{ include "spire.server" . }}
-
+      {{- include "spire.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        app: {{ include "spire.server" . }}
-
+        {{- include "spire.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+        {{- with .Values.commonLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/server-configmap.yaml") . | sha256sum }}
+        {{- with .Values.commonAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.server.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
-      serviceAccountName: {{ include "spire.server" . }}
-
+      serviceAccountName: {{ include "spire.serverServiceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.server.serviceAccount.automountServiceAccountToken }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
+      {{- with .Values.server.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: spire-server
-          image: "{{ .Values.server.image }}:{{ .Values.server.tag }}"
-
+          image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+          imagePullPolicy: {{ .Values.server.image.pullPolicy }}
           args:
             - "-config"
             - "/run/spire/config/server.conf"
-
           ports:
-            - containerPort: {{ .Values.server.port }}
-
+            - name: grpc
+              containerPort: {{ .Values.server.port }}
+          {{- if .Values.storage.postgres.existingSecret.name }}
+          env:
+            - name: SPIRE_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.storage.postgres.existingSecret.name }}
+                  key: {{ .Values.storage.postgres.existingSecret.key }}
+          {{- end }}
+          startupProbe:
+            tcpSocket:
+              port: grpc
+            failureThreshold: {{ .Values.server.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.server.probes.startup.periodSeconds }}
+          readinessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: {{ .Values.server.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: grpc
+            initialDelaySeconds: {{ .Values.server.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.server.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.server.probes.liveness.timeoutSeconds }}
           volumeMounts:
             - name: config
               mountPath: /run/spire/config
             - name: data
               mountPath: /run/spire/data
-
+          securityContext:
+            {{- toYaml .Values.server.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}
       volumes:
         - name: config
           configMap:
             name: {{ include "spire.server" . }}-config
-
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data
+        labels:
+          {{- include "spire.labels" . | nindent 10 }}
+          app.kubernetes.io/component: server
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.storage.class | default "vsphere-db" }}
+        {{- with .Values.storage.class }}
+        storageClassName: {{ . }}
+        {{- end }}
         resources:
           requests:
-            storage: {{ .Values.storage.size | default "1Gi" }}
+            storage: {{ .Values.storage.size }}

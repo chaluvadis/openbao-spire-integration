@@ -1,15 +1,24 @@
+{{- if .Values.service.enabled }}
 apiVersion: v1
 kind: Service
-
 metadata:
-  name: {{ .Release.Name }}
-
+  name: {{ include "openbao.fullname" . }}
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  annotations:
+    {{- with .Values.commonAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with .Values.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
+  type: {{ .Values.service.type }}
   selector:
-    app: {{ .Release.Name }}
-
+    {{- include "openbao.selectorLabels" . | nindent 4 }}
   ports:
-    - port: 8200
-      targetPort: 8200
-
-  type: ClusterIP
+    - name: api
+      port: {{ .Values.service.port }}
+      targetPort: api
+{{- end }}

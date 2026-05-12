@@ -1,44 +1,32 @@
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
-
 metadata:
-  name: {{ .Release.Name }}
-
+  name: {{ include "openbao.fullname" . }}
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 rules:
   - apiGroups: [""]
-    resources:
-      - pods
-      - pods/status
-      - namespaces
-    verbs:
-      - get
-      - list
-      - watch
-      - patch
-      - update
-
+    resources: ["pods", "pods/status", "namespaces"]
+    verbs: ["get", "list", "watch", "patch", "update"]
   - apiGroups: [""]
-    resources:
-      - services
-      - nodes
-    verbs:
-      - get
-      - list
-      - watch
-
+    resources: ["services", "nodes"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
-
 metadata:
-  name: {{ .Release.Name }}
-
+  name: {{ include "openbao.fullname" . }}
+  labels:
+    {{- include "openbao.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ .Release.Name }}
-
+  name: {{ include "openbao.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ .Release.Name }}
+    name: {{ include "openbao.serviceAccountName" . }}
     namespace: {{ .Release.Namespace }}
+{{- end }}
