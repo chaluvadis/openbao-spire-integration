@@ -35,7 +35,7 @@ topologySpreadConstraints: []
 serviceAccount:
   create: true
   name: ""
-  automountServiceAccountToken: false
+  automountServiceAccountToken: true
   annotations: {}
 
 rbac:
