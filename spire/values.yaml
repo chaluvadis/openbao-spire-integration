@@ -1,19 +1,174 @@
+## @section Global parameters
+
+# Override chart name
+nameOverride: ""
+# Override fully qualified app name
+fullnameOverride: ""
+
+# Labels applied to all resources
+commonLabels: {}
+# Annotations applied to all resources
+commonAnnotations: {}
+
+## @section Trust domain
 trustDomain: cluster.local
 
+## @section SPIRE Server configuration
 server:
   image: ghcr.io/spiffe/spire-server
   tag: 1.14.5
+  pullPolicy: IfNotPresent
+
   port: 8081
   replicas: 1
 
+  ## Resource requests and limits
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  ## Pod security context
+  podSecurityContext:
+    fsGroup: 1000
+    runAsUser: 1000
+    runAsGroup: 1000
+
+  ## Container security context
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  ## Scheduling controls
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  topologySpreadConstraints: []
+  priorityClassName: ""
+  podAnnotations: {}
+  podLabels: {}
+
+  ## Probes
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+    tcpSocket:
+      port: grpc
+
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    failureThreshold: 3
+    tcpSocket:
+      port: grpc
+
+  ## Service account
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    automountServiceAccountToken: true
+
+  ## PodDisruptionBudget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+## @section SPIRE Agent configuration
 agent:
   image: ghcr.io/spiffe/spire-agent
   tag: 1.14.5
+  pullPolicy: IfNotPresent
 
+  ## Resource requests and limits
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  ## Pod security context
+  podSecurityContext: {}
+
+  ## Container security context
+  ## Note: agent may need relaxed settings for host socket interaction
+  containerSecurityContext:
+    runAsNonRoot: false
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+  ## Scheduling controls
+  nodeSelector: {}
+  tolerations: []
+  priorityClassName: ""
+  podAnnotations: {}
+  podLabels: {}
+
+  ## Probes
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    failureThreshold: 3
+    tcpSocket:
+      port: health
+
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 15
+    periodSeconds: 30
+    failureThreshold: 3
+    tcpSocket:
+      port: health
+
+  ## Service account
+  serviceAccount:
+    create: true
+    name: ""
+    annotations: {}
+    automountServiceAccountToken: true
+
+## @section Storage / datastore configuration
 storage:
   postgres:
     host: postgres.default.svc.cluster.local
     port: 5432
     db: spire
     user: spire
-    password: spirepass
+    # Do NOT store the password here. Use existingSecret instead.
+    # password: ""  # deprecated — use existingSecret
+    # Name of an existing Secret containing the DB password
+    existingSecret: ""
+    # Key within the existing secret that holds the password
+    existingSecretPasswordKey: password
+    sslmode: disable
+  class: ""
+  size: 1Gi
+
+## @section NetworkPolicy
+networkPolicy:
+  enabled: false
+  extraIngress: []
+  extraEgress: []
+
+## @section Image pull secrets
+imagePullSecrets: []

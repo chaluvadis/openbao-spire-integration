@@ -1,0 +1,94 @@
+{{- if .Values.networkPolicy.enabled }}
+## NetworkPolicy for SPIRE Server
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "spire.server" . }}
+  labels:
+    {{- include "spire.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "spire.server.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow SPIRE agents to connect to the server
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "spire.agent.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.server.port }}
+          protocol: TCP
+    {{- with .Values.networkPolicy.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow kube-apiserver (token review for PSAT attestation)
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
+    # Allow DB connection (Postgres)
+    - ports:
+        - port: {{ .Values.storage.postgres.port }}
+          protocol: TCP
+    {{- with .Values.networkPolicy.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+
+---
+## NetworkPolicy for SPIRE Agent
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "spire.agent" . }}
+  labels:
+    {{- include "spire.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "spire.agent.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow agents to connect to SPIRE server
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "spire.server.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: {{ .Values.server.port }}
+          protocol: TCP
+    # Allow kube-apiserver (required for kubelet workload attestation)
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 6443
+          protocol: TCP
+{{- end }}

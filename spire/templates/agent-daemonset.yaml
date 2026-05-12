@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: DaemonSet
+
+metadata:
+  name: {{ include "spire.agent" . }}
+  labels:
+    {{- include "spire.labels" . | nindent 4 }}
+    app.kubernetes.io/component: agent
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+spec:
+  selector:
+    matchLabels:
+      {{- include "spire.agent.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "spire.agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/agent-configmap.yaml") . | sha256sum }}
+        {{- with .Values.agent.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      serviceAccountName: {{ include "spire.agent.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.agent.serviceAccount.automountServiceAccountToken }}
+
+      {{- if .Values.agent.priorityClassName }}
+      priorityClassName: {{ .Values.agent.priorityClassName }}
+      {{- end }}
+
+      hostPID: true
+
+      {{- with .Values.agent.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      {{- with .Values.agent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: spire-agent
+          image: "{{ .Values.agent.image }}:{{ .Values.agent.tag }}"
+          imagePullPolicy: {{ .Values.agent.pullPolicy }}
+
+          args:
+            - "-config"
+            - "/run/spire/config/agent.conf"
+
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+
+          securityContext:
+            {{- toYaml .Values.agent.containerSecurityContext | nindent 12 }}
+
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+
+          volumeMounts:
+            - name: config
+              mountPath: /run/spire/config
+              readOnly: true
+            - name: socket
+              mountPath: /run/spire/sockets
+            - name: token
+              mountPath: /var/run/secrets/tokens
+
+          {{- if .Values.agent.readinessProbe.enabled }}
+          readinessProbe:
+            initialDelaySeconds: {{ .Values.agent.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.agent.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.agent.readinessProbe.failureThreshold }}
+            tcpSocket:
+              port: health
+          {{- end }}
+
+          {{- if .Values.agent.livenessProbe.enabled }}
+          livenessProbe:
+            initialDelaySeconds: {{ .Values.agent.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.agent.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.agent.livenessProbe.failureThreshold }}
+            tcpSocket:
+              port: health
+          {{- end }}
+
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "spire.agent" . }}-config
+        - name: socket
+          emptyDir: {}
+        - name: token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: spire-agent
+                  expirationSeconds: 7200
+                  audience: spire-server

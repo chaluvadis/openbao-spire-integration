@@ -1,150 +1,234 @@
 ## 📘 SPIRE Helm Chart
 
-Minimal Kubernetes deployment of SPIRE Server and SPIRE Agent using Helm.
+Production-ready deployment of **SPIRE** (SPIFFE Runtime Environment) for zero-trust workload identity on Kubernetes.
 
 ---
 
-## 📦 Install SPIRE
+## 🧭 Prerequisites
 
-Create namespace + install:
+- Kubernetes cluster (v1.24+)
+- Helm 3+
+- PostgreSQL instance accessible from the cluster (for SPIRE Server datastore)
+- StorageClass available (for SPIRE Server persistent volume)
+
+---
+
+## 📦 Installation
+
+### Create a database password Secret (required before install)
+
+**Do not store the database password in `values.yaml`.** Create a Kubernetes Secret instead:
+
+```bash
+kubectl create namespace spire
+
+kubectl create secret generic spire-postgres-credentials \
+  --from-literal=password=<YOUR_DB_PASSWORD> \
+  -n spire
+```
+
+### Install SPIRE
 
 ```bash
 helm install spire ./spire \
   -n spire \
-  --create-namespace
+  --create-namespace \
+  -f my-values.yaml
 ```
 
----
-
-## 📄 Verify Installation
-
-Check pods:
+### Verify installation
 
 ```bash
-kubectl get pods -n spire
-```
+# Check server
+kubectl get pods -n spire -l app.kubernetes.io/component=server
 
-Check SPIRE server:
+# Check agents (one per node)
+kubectl get pods -n spire -l app.kubernetes.io/component=agent
 
-```bash
+# View server logs
 kubectl logs -n spire statefulset/spire-server
 ```
 
-Check SPIRE agent:
-
-```bash
-kubectl get pods -n spire -l app=spire-agent
-```
-
 ---
 
-## 🔄 Upgrade SPIRE
+## 🔒 Security posture
 
-If you change values or templates:
+### Database credentials
 
-```bash
-helm upgrade spire ./spire -n spire
+**Never store the Postgres password in `values.yaml`.** Use `storage.postgres.existingSecret`:
+
+```yaml
+storage:
+  postgres:
+    host: postgres.default.svc.cluster.local
+    port: 5432
+    db: spire
+    user: spire
+    existingSecret: spire-postgres-credentials
+    existingSecretPasswordKey: password
+    sslmode: require
 ```
 
-To force re-deploy:
+The password is injected as an environment variable from the Secret — it never appears in ConfigMaps or Helm release history.
 
-```bash
-helm upgrade spire ./spire -n spire --force
+### Security contexts
+
+Both server and agent use hardened security contexts by default:
+
+```yaml
+server:
+  containerSecurityContext:
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
 ```
 
----
+The agent runs with `hostPID: true` (required for workload attestation) but drops all capabilities.
 
-## 🧹 Uninstall SPIRE
+### RBAC
 
-Remove all resources:
-
-```bash
-helm uninstall spire -n spire
-```
-
-(Optional cleanup if namespace was created by Helm)
-
-```bash
-kubectl delete namespace spire
-```
+- **Server**: ClusterRole limited to `tokenreviews` (required for PSAT attestation)
+- **Agent**: ClusterRole limited to read-only access to `pods`, `nodes`, `nodes/proxy`
 
 ---
 
 ## ⚙️ Configuration
 
-## values.yaml
+### Hardened production values example
 
 ```yaml
+trustDomain: example.com
+
 server:
-  image: ghcr.io/spiffe/spire-server:1.14.5
   replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  readinessProbe:
+    enabled: true
+  livenessProbe:
+    enabled: true
 
 agent:
-  image: ghcr.io/spiffe/spire-agent:1.14.5
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
 
-trustDomain: cluster.local
+storage:
+  postgres:
+    host: postgres.spire.svc.cluster.local
+    port: 5432
+    db: spire
+    user: spire
+    existingSecret: spire-postgres-credentials
+    existingSecretPasswordKey: password
+    sslmode: require
+  size: 2Gi
+
+networkPolicy:
+  enabled: true
 ```
+
+### Key values reference
+
+| Parameter | Description | Default |
+|---|---|---|
+| `trustDomain` | SPIFFE trust domain | `cluster.local` |
+| `server.replicas` | Number of SPIRE Server pods | `1` |
+| `server.port` | SPIRE Server gRPC port | `8081` |
+| `server.resources` | Server container resources | see values.yaml |
+| `server.podDisruptionBudget.enabled` | Enable PDB for server | `false` |
+| `agent.resources` | Agent container resources | see values.yaml |
+| `storage.postgres.existingSecret` | Secret name for DB password | `""` |
+| `storage.postgres.sslmode` | Postgres SSL mode | `disable` |
+| `storage.size` | PVC size for SPIRE Server | `1Gi` |
+| `networkPolicy.enabled` | Enable NetworkPolicy | `false` |
 
 ---
 
-## 🧠 Architecture Overview
+## 🔄 Upgrade notes
+
+- Config checksum annotations trigger automatic pod restarts on ConfigMap changes.
+- SPIRE Server upgrades must be done carefully — always check the SPIRE release notes for datastore migration requirements before upgrading.
+- Agent DaemonSets roll out automatically; verify agent health after upgrades.
+- **Avoid `helm upgrade --force`** — it forcefully replaces resources and can interrupt identity issuance.
+
+---
+
+## 🧠 Architecture
 
 This chart deploys:
 
-- SPIRE Server (StatefulSet)
-- SPIRE Agent (DaemonSet)
-- Kubernetes RBAC for node attestation
-- ConfigMaps for server + agent configuration
+- **SPIRE Server** — StatefulSet with Postgres datastore; issues SVIDs to attested workloads
+- **SPIRE Agent** — DaemonSet; runs on each node, attests workloads and delivers SVIDs via a Unix socket
+
+### Identity model
+
+SPIFFE IDs take the form:
+
+```
+spiffe://cluster.local/ns/<namespace>/sa/<service-account>
+```
+
+### Workload registration example
+
+```bash
+kubectl exec -n spire spire-server-0 -- \
+  /opt/spire/bin/spire-server entry create \
+  -spiffeID spiffe://cluster.local/ns/default/sa/myapp \
+  -parentID spiffe://cluster.local/ns/spire/sa/spire-agent \
+  -selector k8s:ns:default \
+  -selector k8s:sa:myapp
+```
 
 ---
 
-## 🔐 Identity Model
+## 🧹 Uninstall
 
-SPIRE provides workload identity using SPIFFE IDs:
-
-Example:
-
-```
-spiffe://cluster.local/ns/spire/sa/app
+```bash
+helm uninstall spire -n spire
+kubectl delete pvc -l app.kubernetes.io/name=spire -n spire
 ```
 
 ---
 
 ## 🧪 Troubleshooting
 
-### Check SPIRE server logs
+**Agents not connecting to server:**
+```bash
+kubectl logs -n spire -l app.kubernetes.io/component=agent
+# Check that server is reachable and trust bundle is valid
+```
 
+**Server not starting:**
 ```bash
 kubectl logs -n spire statefulset/spire-server
+# Check Postgres connectivity and credentials
 ```
 
----
-
-### Check SPIRE agent logs
-
+**Token review failures:**
 ```bash
-kubectl logs -n spire daemonset/spire-agent
+# Verify server ClusterRole includes tokenreviews
+kubectl auth can-i create tokenreviews --as=system:serviceaccount:spire:spire-server
 ```
 
----
-
-### Restart SPIRE components
-
+**Restart components:**
 ```bash
 kubectl rollout restart statefulset spire-server -n spire
 kubectl rollout restart daemonset spire-agent -n spire
 ```
-
----
-
-### Common issues
-
-#### 1. Agent not connecting
-
-- check `spire-server` service DNS
-- verify port `8081`
-
-#### 2. Pods not attesting
-
-- verify RBAC permissions
-- check `k8s_psat` plugin config

@@ -1,0 +1,26 @@
+{{- $scheme := include "openbao.scheme" . }}
+{{- $fullname := include "openbao.fullname" . }}
+1. OpenBao is now deployed in the {{ .Release.Namespace }} namespace.
+
+   Get the OpenBao API endpoint:
+     kubectl get svc {{ $fullname }} -n {{ .Release.Namespace }}
+
+2. To initialize OpenBao (first-time setup):
+     kubectl exec -n {{ .Release.Namespace }} {{ $fullname }}-0 -- bao operator init
+
+   Store the unseal keys and root token securely!
+
+3. To unseal OpenBao (required after each restart unless auto-unseal is configured):
+     kubectl exec -n {{ .Release.Namespace }} {{ $fullname }}-0 -- bao operator unseal <UNSEAL_KEY>
+
+   Repeat with different keys until the threshold is met (default: 3 of 5).
+
+4. TLS is currently {{ if .Values.tls.enabled }}ENABLED{{ else }}DISABLED (dev/test mode only — not suitable for production){{ end }}.
+{{- if not .Values.tls.enabled }}
+
+   ⚠️  WARNING: TLS is disabled. For production deployments:
+   - Create a TLS secret: kubectl create secret tls openbao-tls --cert=tls.crt --key=tls.key -n {{ .Release.Namespace }}
+   - Set tls.enabled=true and tls.secretName=openbao-tls in your values.
+{{- end }}
+
+5. For more information visit: https://openbao.org/docs/
