@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "spire.server" . }}-config
+
+data:
+  server.conf: |
+    server {
+      bind_address = "0.0.0.0"
+      bind_port = "{{ .Values.server.port }}"
+      trust_domain = "{{ .Values.trustDomain }}"
+      data_dir = "/run/spire/data"
+    }
+
+    plugins {
+
+      DataStore "sql" {
+        plugin_data {
+          database_type = "postgres"
+
+          connection_string = "host={{ .Values.storage.postgres.host }} \
+            port={{ .Values.storage.postgres.port }} \
+            dbname={{ .Values.storage.postgres.db }} \
+            user={{ .Values.storage.postgres.user }} \
+            password={{ .Values.storage.postgres.password }} \
+            sslmode=disable"
+        }
+      }
+
+      NodeAttestor "k8s_psat" {
+        plugin_data {
+          clusters = {
+            "{{ .Release.Name }}" = {}
+          }
+        }
+      }
+
+      KeyManager "memory" {}
+    }

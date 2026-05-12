@@ -1,0 +1,6 @@
+apiVersion: v2
+name: spire
+description: Minimal SPIRE deployment
+type: application
+version: 0.1.0
+appVersion: "1.14.5"

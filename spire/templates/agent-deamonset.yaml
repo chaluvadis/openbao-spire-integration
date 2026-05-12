@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: DaemonSet
+
+metadata:
+  name: {{ include "spire.agent" . }}
+
+spec:
+  selector:
+    matchLabels:
+      app: {{ include "spire.agent" . }}
+
+  template:
+    metadata:
+      labels:
+        app: {{ include "spire.agent" . }}
+
+    spec:
+      serviceAccountName: {{ include "spire.agent" . }}
+
+      containers:
+        - name: spire-agent
+          image: "{{ .Values.agent.image }}:{{ .Values.agent.tag }}"
+
+          args:
+            - "-config"
+            - "/run/spire/config/agent.conf"
+
+          volumeMounts:
+            - name: config
+              mountPath: /run/spire/config
+            - name: socket
+              mountPath: /run/spire/sockets
+
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "spire.agent" . }}-config
+
+        - name: socket
+          emptyDir: {}

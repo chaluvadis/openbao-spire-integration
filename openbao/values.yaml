@@ -1,0 +1,28 @@
+image:
+  repository: ghcr.io/openbao/openbao
+  tag: "2.5.3"
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 8200
+
+dataStorage:
+  enabled: true
+  size: 10Gi
+  storageClass: vsphere-db
+
+serviceAccount:
+  create: true
+  name: openbao
+
+resources: {}
+
+injector:
+  enabled: false
+
+serverReplicaCount: 3
+
+networkPolicy:
+  enabled: false

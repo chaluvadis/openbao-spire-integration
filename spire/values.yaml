@@ -1,0 +1,19 @@
+trustDomain: cluster.local
+
+server:
+  image: ghcr.io/spiffe/spire-server
+  tag: 1.14.5
+  port: 8081
+  replicas: 1
+
+agent:
+  image: ghcr.io/spiffe/spire-agent
+  tag: 1.14.5
+
+storage:
+  postgres:
+    host: postgres.default.svc.cluster.local
+    port: 5432
+    db: spire
+    user: spire
+    password: spirepass
