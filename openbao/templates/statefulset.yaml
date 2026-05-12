@@ -95,6 +95,8 @@ spec:
               mountPath: /etc/openbao
             - name: data
               mountPath: /openbao/data
+            - name: tmp
+              mountPath: /tmp
             {{- if .Values.tls.enabled }}
             - name: tls
               mountPath: /etc/openbao/tls
@@ -106,6 +108,8 @@ spec:
         - name: config
           configMap:
             name: {{ include "openbao.fullname" . }}-config
+        - name: tmp
+          emptyDir: {}
         {{- if .Values.tls.enabled }}
         - name: tls
           secret:

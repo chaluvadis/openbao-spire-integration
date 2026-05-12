@@ -22,7 +22,16 @@ data:
       DataStore "sql" {
         plugin_data {
           database_type = "postgres"
-          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }}{{- if .Values.storage.postgres.existingSecret.name }} password=${SPIRE_POSTGRES_PASSWORD}{{- else if .Values.storage.postgres.password }} password={{ .Values.storage.postgres.password }}{{- end }} sslmode={{ .Values.storage.postgres.sslmode }}"
+          connection_string = "host={{ .Values.storage.postgres.host }} \
+            port={{ .Values.storage.postgres.port }} \
+            dbname={{ .Values.storage.postgres.db }} \
+            user={{ .Values.storage.postgres.user }} \
+            {{- if .Values.storage.postgres.existingSecret.name }}
+            password=${SPIRE_POSTGRES_PASSWORD} \
+            {{- else if .Values.storage.postgres.password }}
+            password={{ .Values.storage.postgres.password }} \
+            {{- end }}
+            sslmode={{ .Values.storage.postgres.sslmode }}"
         }
       }
 
