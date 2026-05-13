@@ -1,43 +1,31 @@
-## @section Global parameters
-
-# Override chart name
 nameOverride: ""
-# Override fully qualified app name
 fullnameOverride: ""
 
-# Labels applied to all resources
-commonLabels: {}
-# Annotations applied to all resources
-commonAnnotations: {}
-
-## @section Trust domain
 trustDomain: cluster.local
 
-## @section SPIRE Server configuration
-server:
-  image: ghcr.io/spiffe/spire-server
-  tag: 1.14.5
-  pullPolicy: IfNotPresent
+commonLabels: {}
+commonAnnotations: {}
 
+imagePullSecrets: []
+priorityClassName: ""
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+
+server:
+  image:
+    repository: ghcr.io/spiffe/spire-server
+    tag: "1.14.5"
+    pullPolicy: IfNotPresent
   port: 8081
   replicas: 1
-
-  ## Resource requests and limits
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
-
-  ## Pod security context
-  podSecurityContext:
-    fsGroup: 1000
-    runAsUser: 1000
-    runAsGroup: 1000
-
-  ## Container security context
+  service:
+    type: ClusterIP
+    annotations: {}
+  podAnnotations: {}
+  podSecurityContext: {}
   containerSecurityContext:
     runAsNonRoot: true
     allowPrivilegeEscalation: false
@@ -47,67 +35,46 @@ server:
         - ALL
     seccompProfile:
       type: RuntimeDefault
-
-  ## Scheduling controls
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-  topologySpreadConstraints: []
-  priorityClassName: ""
-  podAnnotations: {}
-  podLabels: {}
-
-  ## Probes
-  readinessProbe:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    startup:
+      failureThreshold: 30
+      periodSeconds: 5
+    readiness:
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 3
+    liveness:
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      timeoutSeconds: 3
+  podDisruptionBudget:
     enabled: true
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    failureThreshold: 3
-    tcpSocket:
-      port: grpc
-
-  livenessProbe:
-    enabled: true
-    initialDelaySeconds: 15
-    periodSeconds: 30
-    failureThreshold: 3
-    tcpSocket:
-      port: grpc
-
-  ## Service account
+    minAvailable: 1
+  revisionHistoryLimit: 10
+  updateStrategy:
+    type: RollingUpdate
   serviceAccount:
     create: true
     name: ""
-    annotations: {}
     automountServiceAccountToken: true
+    annotations: {}
 
-  ## PodDisruptionBudget
-  podDisruptionBudget:
-    enabled: false
-    minAvailable: 1
-
-## @section SPIRE Agent configuration
 agent:
-  image: ghcr.io/spiffe/spire-agent
-  tag: 1.14.5
-  pullPolicy: IfNotPresent
-
-  ## Resource requests and limits
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 256Mi
-
-  ## Pod security context
+  image:
+    repository: ghcr.io/spiffe/spire-agent
+    tag: "1.14.5"
+    pullPolicy: IfNotPresent
+  podAnnotations: {}
   podSecurityContext: {}
-
-  ## Container security context
-  ## Note: agent may need relaxed settings for host socket interaction
   containerSecurityContext:
-    runAsNonRoot: false
+    runAsNonRoot: true
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
     capabilities:
@@ -115,60 +82,47 @@ agent:
         - ALL
     seccompProfile:
       type: RuntimeDefault
-
-  ## Scheduling controls
-  nodeSelector: {}
-  tolerations: []
-  priorityClassName: ""
-  podAnnotations: {}
-  podLabels: {}
-
-  ## Probes
-  readinessProbe:
-    enabled: true
-    initialDelaySeconds: 5
-    periodSeconds: 10
-    failureThreshold: 3
-    tcpSocket:
-      port: health
-
-  livenessProbe:
-    enabled: true
-    initialDelaySeconds: 15
-    periodSeconds: 30
-    failureThreshold: 3
-    tcpSocket:
-      port: health
-
-  ## Service account
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
   serviceAccount:
     create: true
     name: ""
-    annotations: {}
     automountServiceAccountToken: true
+    annotations: {}
+  probes:
+    enabled: false
+    command:
+      - /opt/spire/bin/spire-agent
+      - healthcheck
+    readiness:
+      periodSeconds: 10
+      timeoutSeconds: 3
+    liveness:
+      periodSeconds: 20
+      timeoutSeconds: 3
 
-## @section Storage / datastore configuration
 storage:
+  class: ""
+  size: 1Gi
   postgres:
     host: postgres.default.svc.cluster.local
     port: 5432
     db: spire
     user: spire
-    # Do NOT store the password here. Use existingSecret instead.
-    # password: ""  # deprecated — use existingSecret
-    # Name of an existing Secret containing the DB password
-    existingSecret: ""
-    # Key within the existing secret that holds the password
-    existingSecretPasswordKey: password
     sslmode: disable
-  class: ""
-  size: 1Gi
+    password: ""
+    existingSecret:
+      name: ""
+      key: password
 
-## @section NetworkPolicy
 networkPolicy:
   enabled: false
-  extraIngress: []
-  extraEgress: []
-
-## @section Image pull secrets
-imagePullSecrets: []
+  allowDns: true
+  serverIngress: []
+  serverEgress: []
+  agentEgress: []

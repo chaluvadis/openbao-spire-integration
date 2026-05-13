@@ -9,27 +9,29 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-
 data:
-  server.conf.tpl: |
+  server.conf: |
     server {
       bind_address = "0.0.0.0"
       bind_port = "{{ .Values.server.port }}"
       trust_domain = "{{ .Values.trustDomain }}"
       data_dir = "/run/spire/data"
-      log_level = "INFO"
     }
 
     plugins {
-
       DataStore "sql" {
         plugin_data {
           database_type = "postgres"
-          {{- if .Values.storage.postgres.existingSecret }}
-          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} password=SPIRE_DB_PASSWORD_PLACEHOLDER sslmode={{ .Values.storage.postgres.sslmode }}"
-          {{- else }}
-          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} sslmode={{ .Values.storage.postgres.sslmode }}"
-          {{- end }}
+          connection_string = "host={{ .Values.storage.postgres.host }} \
+            port={{ .Values.storage.postgres.port }} \
+            dbname={{ .Values.storage.postgres.db }} \
+            user={{ .Values.storage.postgres.user }} \
+            {{- if .Values.storage.postgres.existingSecret.name }}
+            password=${SPIRE_POSTGRES_PASSWORD} \
+            {{- else if .Values.storage.postgres.password }}
+            password={{ .Values.storage.postgres.password }} \
+            {{- end }}
+            sslmode={{ .Values.storage.postgres.sslmode }}"
         }
       }
 

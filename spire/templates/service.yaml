@@ -5,17 +5,19 @@ metadata:
   labels:
     {{- include "spire.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
-  {{- with .Values.commonAnnotations }}
   annotations:
+    {{- with .Values.commonAnnotations }}
     {{- toYaml . | nindent 4 }}
-  {{- end }}
-
+    {{- end }}
+    {{- with .Values.server.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
+  type: {{ .Values.server.service.type }}
   selector:
-    {{- include "spire.server.selectorLabels" . | nindent 4 }}
-
+    {{- include "spire.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: server
   ports:
-    - name: grpc
+    - name: api
       port: {{ .Values.server.port }}
       targetPort: grpc
-      protocol: TCP

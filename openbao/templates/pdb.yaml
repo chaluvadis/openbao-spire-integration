@@ -6,17 +6,8 @@ metadata:
   labels:
     {{- include "openbao.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
 spec:
-  {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
-  {{- end }}
-  {{- if .Values.podDisruptionBudget.maxUnavailable }}
-  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "openbao.selectorLabels" . | nindent 6 }}

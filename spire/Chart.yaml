@@ -1,18 +1,7 @@
 apiVersion: v2
 name: spire
-description: Production-ready SPIRE deployment for zero-trust workload identity on Kubernetes
+description: Minimal SPIRE deployment
 type: application
-version: 0.2.0
+version: 0.1.0
 appVersion: "1.14.5"
 kubeVersion: ">=1.24.0-0"
-keywords:
-  - spiffe
-  - spire
-  - identity
-  - zero-trust
-  - pki
-home: https://spiffe.io
-sources:
-  - https://github.com/spiffe/spire
-maintainers:
-  - name: chaluvadis

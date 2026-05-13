@@ -5,10 +5,7 @@ metadata:
   name: {{ include "openbao.fullname" . }}
   labels:
     {{- include "openbao.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    app.kubernetes.io/component: server
 spec:
   podSelector:
     matchLabels:
@@ -18,45 +15,28 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # Allow OpenBao peers to communicate (raft cluster port)
     - from:
-        - podSelector:
-            matchLabels:
-              {{- include "openbao.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: server
+        {{- if .Values.networkPolicy.ingress }}
+        {{- toYaml .Values.networkPolicy.ingress | nindent 8 }}
+        {{- else }}
+        - podSelector: {}
+        {{- end }}
       ports:
-        - port: {{ .Values.service.clusterPort }}
-          protocol: TCP
-    # Allow API access from within the cluster (default: any pod in the namespace)
-    - ports:
         - port: {{ .Values.service.port }}
           protocol: TCP
-    {{- with .Values.networkPolicy.extraIngress }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+        - port: {{ .Values.service.clusterPort }}
+          protocol: TCP
   egress:
-    # Allow DNS
-    - ports:
+    {{- if .Values.networkPolicy.allowDns }}
+    - to:
+        - namespaceSelector: {}
+      ports:
         - port: 53
           protocol: UDP
         - port: 53
           protocol: TCP
-    # Allow intra-cluster peer communication
-    - to:
-        - podSelector:
-            matchLabels:
-              {{- include "openbao.selectorLabels" . | nindent 14 }}
-              app.kubernetes.io/component: server
-      ports:
-        - port: {{ .Values.service.clusterPort }}
-          protocol: TCP
-    # Allow kube-apiserver access (required for kubernetes service_registration)
-    - ports:
-        - port: 443
-          protocol: TCP
-        - port: 6443
-          protocol: TCP
-    {{- with .Values.networkPolicy.extraEgress }}
+    {{- end }}
+    {{- with .Values.networkPolicy.egress }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 {{- end }}

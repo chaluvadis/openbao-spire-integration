@@ -1,87 +1,30 @@
-{{- if .Values.rbac.create -}}
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "openbao.fullname" . }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "openbao.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-rules:
-  - apiGroups: [""]
-    resources:
-      - pods
-      - pods/status
-    verbs:
-      - get
-      - list
-      - watch
-      - patch
-      - update
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "openbao.fullname" . }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "openbao.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "openbao.fullname" . }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ include "openbao.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
-
----
-# ClusterRole is required for Kubernetes service_registration to discover
-# namespaces and services across the cluster for HA peer routing.
+{{- if .Values.rbac.create }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "openbao.fullname" . }}-cluster
+  name: {{ include "openbao.fullname" . }}
   labels:
     {{- include "openbao.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    app.kubernetes.io/component: server
 rules:
   - apiGroups: [""]
-    resources:
-      - namespaces
-      - services
-      - nodes
-    verbs:
-      - get
-      - list
-      - watch
-
+    resources: ["pods", "pods/status", "namespaces"]
+    verbs: ["get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["services", "nodes"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "openbao.fullname" . }}-cluster
+  name: {{ include "openbao.fullname" . }}
   labels:
     {{- include "openbao.labels" . | nindent 4 }}
-  {{- with .Values.commonAnnotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+    app.kubernetes.io/component: server
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "openbao.fullname" . }}-cluster
+  name: {{ include "openbao.fullname" . }}
 subjects:
   - kind: ServiceAccount
     name: {{ include "openbao.serviceAccountName" . }}
