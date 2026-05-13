@@ -1,15 +1,11 @@
 {{- define "spire.name" -}}
-{{ .Release.Name }}
-{{- end }}
+{{ .Release.Name }}-spire
+{{- end -}}
 
-{{- define "spire.server" -}}
-{{ .Release.Name }}-server
-{{- end }}
+{{- define "spire.server.name" -}}
+{{ include "spire.name" . }}-server
+{{- end -}}
 
-{{- define "spire.agent" -}}
-{{ .Release.Name }}-agent
-{{- end }}
-
-{{- define "spire.fqdn" -}}
-{{ include "spire.server" . }}.{{ .Release.Namespace }}.svc.cluster.local
-{{- end }}
+{{- define "spire.agent.name" -}}
+{{ include "spire.name" . }}-agent
+{{- end -}}

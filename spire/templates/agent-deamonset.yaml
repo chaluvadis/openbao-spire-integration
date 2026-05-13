@@ -1,40 +1,74 @@
 apiVersion: apps/v1
 kind: DaemonSet
-
 metadata:
-  name: {{ include "spire.agent" . }}
+  name: {{ include "spire.agent.name" . }}
 
 spec:
   selector:
     matchLabels:
-      app: {{ include "spire.agent" . }}
+      app: {{ include "spire.agent.name" . }}
 
   template:
     metadata:
       labels:
-        app: {{ include "spire.agent" . }}
+        app: {{ include "spire.agent.name" . }}
 
     spec:
-      serviceAccountName: {{ include "spire.agent" . }}
+      serviceAccountName: {{ .Values.serviceAccount.agent }}
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
 
       containers:
-        - name: spire-agent
+        - name: agent
           image: "{{ .Values.agent.image }}:{{ .Values.agent.tag }}"
 
           args:
             - "-config"
             - "/run/spire/config/agent.conf"
+            - "-socketPath"
+            - "/run/spire/sockets/api.sock"
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
 
           volumeMounts:
             - name: config
               mountPath: /run/spire/config
-            - name: socket
+            
+            - name: spire-data
+              mountPath: /run/spire
+            
+            - name: spire-workload-api
               mountPath: /run/spire/sockets
+
+            - name: spire-token
+              mountPath: /var/run/secrets/tokens
+              readOnly: true
 
       volumes:
         - name: config
           configMap:
-            name: {{ include "spire.agent" . }}-config
-
-        - name: socket
+            name: {{ include "spire.agent.name" . }}-config
+        
+        - name: spire-data
           emptyDir: {}
+        
+        - name: spire-workload-api
+          emptyDir: {}
+
+        - name: spire-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: {{ .Values.agent.psat.tokenPath }}
+                  audience: {{ .Values.agent.psat.audience }}
+                  expirationSeconds: {{ .Values.agent.psat.expirationSeconds }}

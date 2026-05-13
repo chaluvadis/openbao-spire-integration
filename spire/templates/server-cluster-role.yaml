@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "spire.server.name" . }}
+
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - nodes
+      - namespaces
+    verbs:
+      - get
+      - list
+      - watch
+
+  - apiGroups: ["authentication.k8s.io"]
+    resources:
+      - tokenreviews
+    verbs:
+      - create

@@ -9,7 +9,7 @@ spec:
     app: {{ .Release.Name }}
 
   ports:
-    - port: 8200
-      targetPort: 8200
+    - port: {{ .Values.service.port}}
+      targetPort: {{ .Values.service.port}}
 
   type: ClusterIP

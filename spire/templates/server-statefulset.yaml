@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: StatefulSet
-
 metadata:
-  name: {{ include "spire.server" . }}
+  name: {{ include "spire.server.name" . }}
 
 spec:
-  serviceName: {{ include "spire.server" . }}
-  replicas: {{ .Values.server.replicas }}
+  serviceName: {{ include "spire.server.name" . }}
+  replicas: 1
 
   selector:
     matchLabels:
-      app: {{ include "spire.server" . }}
+      app: {{ include "spire.server.name" . }}
 
   template:
     metadata:
       labels:
-        app: {{ include "spire.server" . }}
+        app: {{ include "spire.server.name" . }}
 
     spec:
-      serviceAccountName: {{ include "spire.server" . }}
+      serviceAccountName: {{ .Values.serviceAccount.server }}
 
       containers:
-        - name: spire-server
+        - name: server
           image: "{{ .Values.server.image }}:{{ .Values.server.tag }}"
+          imagePullPolicy: IfNotPresent
 
           args:
             - "-config"
@@ -34,20 +34,28 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /run/spire/config
+
             - name: data
               mountPath: /run/spire/data
+
+            - name: tls
+              mountPath: /certs
+              readOnly: true
 
       volumes:
         - name: config
           configMap:
-            name: {{ include "spire.server" . }}-config
+            name: {{ include "spire.server.name" . }}-config
+
+        - name: tls
+          secret:
+            secretName: {{ include "spire.server.name" . }}-tls
 
   volumeClaimTemplates:
     - metadata:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: {{ .Values.storage.class | default "vsphere-db" }}
         resources:
           requests:
-            storage: {{ .Values.storage.size | default "1Gi" }}
+            storage: {{ .Values.server.storageSize }}

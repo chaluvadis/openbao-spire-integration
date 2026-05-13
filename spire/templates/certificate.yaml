@@ -1,0 +1,19 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "spire.server.name" . }}-tls
+  namespace: {{ .Release.Namespace }}
+
+spec:
+  secretName: {{ include "spire.server.name" . }}-tls
+
+  issuerRef:
+    name: {{ include "spire.name" . }}-issuer
+    kind: ClusterIssuer
+
+  dnsNames:
+    - {{ include "spire.server.name" . }}
+    - {{ include "spire.server.name" . }}.{{ .Release.Namespace }}.svc.cluster.local
+  
+  privateKey:
+    rotationPolicy: Always

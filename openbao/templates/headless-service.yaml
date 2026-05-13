@@ -12,9 +12,9 @@ spec:
 
   ports:
     - name: api
-      port: 8200
-      targetPort: 8200
+      port: {{ .Values.service.port}}
+      targetPort: {{ .Values.service.port}}
 
     - name: cluster
-      port: 8201
-      targetPort: 8201
+      port: {{ .Values.service.clusterPort}}
+      targetPort: {{ .Values.service.clusterPort}}

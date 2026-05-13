@@ -1,19 +1,44 @@
-trustDomain: cluster.local
+certManager:
+  enabled: true
 
 server:
   image: ghcr.io/spiffe/spire-server
   tag: 1.14.5
   port: 8081
+  storageSize: 1Gi
   replicas: 1
+  trustDomain: cluster.local
+  bundlePort: 8043
 
 agent:
   image: ghcr.io/spiffe/spire-agent
   tag: 1.14.5
+  trustDomain: cluster.local
+
+  trustBundlePath: /run/spire/bundle/bundle.crt
+
+  nodeAttestor:
+    k8sPsat: true
+
+  plugins:
+    workloadAttestors:
+      k8s: true
+
+  logLevel: INFO
+
+  psat:
+      tokenPath: spire-agent
+      audience: spire-server
+      expirationSeconds: 600
 
 storage:
   postgres:
-    host: postgres.default.svc.cluster.local
-    port: 5432
+    host: int-rke-worker01.int.taqniat.ae
+    port: 32001
     db: spire
-    user: spire
-    password: spirepass
+    user: appadmin
+    password: appadmin
+
+serviceAccount:
+  server: spire-server
+  agent: spire-agent

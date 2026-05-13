@@ -38,10 +38,10 @@ spec:
 
           ports:
             - name: api
-              containerPort: 8200
+              containerPort: {{ .Values.service.port}}
 
             - name: cluster
-              containerPort: 8201
+              containerPort: {{ .Values.service.clusterPort}}
 
           env:
             - name: POD_NAME

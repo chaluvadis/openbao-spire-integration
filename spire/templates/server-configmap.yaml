@@ -1,15 +1,20 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "spire.server" . }}-config
+  name: {{ include "spire.server.name" . }}-config
 
 data:
   server.conf: |
     server {
       bind_address = "0.0.0.0"
-      bind_port = "{{ .Values.server.port }}"
-      trust_domain = "{{ .Values.trustDomain }}"
+      trust_domain = "{{ .Values.server.trustDomain }}"
       data_dir = "/run/spire/data"
+    }
+
+    listener "tcp" {
+      address = "0.0.0.0:{{ .Values.server.port }}"
+      tls_cert_file = "/certs/tls.crt"
+      tls_key_file  = "/certs/tls.key"
     }
 
     plugins {
@@ -17,20 +22,18 @@ data:
       DataStore "sql" {
         plugin_data {
           database_type = "postgres"
-
-          connection_string = "host={{ .Values.storage.postgres.host }} \
-            port={{ .Values.storage.postgres.port }} \
-            dbname={{ .Values.storage.postgres.db }} \
-            user={{ .Values.storage.postgres.user }} \
-            password={{ .Values.storage.postgres.password }} \
-            sslmode=disable"
+          connection_string = "host={{ .Values.storage.postgres.host }} port={{ .Values.storage.postgres.port }} dbname={{ .Values.storage.postgres.db }} user={{ .Values.storage.postgres.user }} password={{ .Values.storage.postgres.password }} sslmode=disable"
         }
       }
 
       NodeAttestor "k8s_psat" {
         plugin_data {
           clusters = {
-            "{{ .Release.Name }}" = {}
+            "{{ .Release.Name }}" = {
+              service_account_allow_list = [
+                "{{ .Release.Namespace }}:{{ .Values.serviceAccount.agent }}"
+              ]
+            }
           }
         }
       }

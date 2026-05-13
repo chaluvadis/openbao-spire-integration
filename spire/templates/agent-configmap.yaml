@@ -1,22 +1,32 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "spire.agent" . }}-config
+  name: {{ include "spire.agent.name" . }}-config
 
 data:
   agent.conf: |
     agent {
+      trust_domain = "{{ .Values.agent.trustDomain }}"
       data_dir = "/run/spire"
-      log_level = "INFO"
+      log_level = "{{ .Values.agent.logLevel }}"
 
-      server_address = "{{ include "spire.fqdn" . }}"
-      server_port = "{{ .Values.server.port }}"
+      server_address = "{{ include "spire.server.name" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+      server_port = {{ .Values.server.port }}
+
+      insecure_bootstrap = true
     }
 
     plugins {
+
       NodeAttestor "k8s_psat" {
         plugin_data {
           cluster = "{{ .Release.Name }}"
+        }
+      }
+
+      WorkloadAttestor "k8s" {
+        plugin_data {
+          kubelet_api_socket = "/var/run/kubelet.sock"
         }
       }
 
